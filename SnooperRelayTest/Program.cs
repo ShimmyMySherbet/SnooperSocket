@@ -14,6 +14,10 @@ namespace SnooperRelayTest
         public static string Username;
         public static string ClientName;
 
+
+        /// For a better example project, see SSocketChatTest. This is also a simple chat program, however it also uses SnooperSocketClientPools and SnooperPoolChannels to allow for multiple clients.
+        /// In tests, with 100 active clients, the server still had 0% idle CPU and only 38MB of RAM usage.
+
         private static void Main(string[] args)
         {
             Console.Write("SERVER/CLIENT [S/C]");

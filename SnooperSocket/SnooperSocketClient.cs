@@ -41,9 +41,10 @@ namespace SnooperSocket
             }
         }
 
-        public SnooperSocketClient()
+        public SnooperSocketClient(TcpClient tcpClient = null)
         {
             Channels = new SnooperChannelStack(this);
+            if (tcpClient != null) Client = tcpClient;
         }
 
         public void JoinPool(SnooperSocketClientPool Pool)
