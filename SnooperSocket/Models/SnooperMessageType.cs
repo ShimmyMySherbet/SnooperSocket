@@ -10,6 +10,8 @@ namespace SnooperSocket.Models
     {
         Unknown = -1,
         Binary = 0,
-        Object = 1
+        Object = 1,
+        Request = 2,
+        Response = 3
     }
 }

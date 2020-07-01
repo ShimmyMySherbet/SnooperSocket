@@ -17,6 +17,8 @@ namespace SnooperSocket.Models
         public string RawHeaderData;
         public bool IsManagedMessage;
         public bool Requesthandled = false;
+        public bool IsRequest = false;
+
         public Dictionary<string, string> Headers = new Dictionary<string, string>();
 
         public T ReadObject<T>()

@@ -44,12 +44,15 @@
     <Reference Include="System.Xml" />
   </ItemGroup>
   <ItemGroup>
+    <Compile Include="Cryptography\CryptographicProvider.cs" />
     <Compile Include="Models\SnooperBytes.cs" />
     <Compile Include="Models\SnooperChannel.cs" />
     <Compile Include="Models\SnooperChannelStack.cs" />
     <Compile Include="Models\SnooperMessageType.cs" />
     <Compile Include="Models\SnooperPoolChannel.cs" />
     <Compile Include="Models\SnooperPoolChannelStack.cs" />
+    <Compile Include="Models\SnooperRequest.cs" />
+    <Compile Include="Models\SnooperRequestStack.cs" />
     <Compile Include="Models\SnooperSocketClientPool.cs" />
     <Compile Include="Models\SnooperSocketClientPoolOfT.cs" />
     <Compile Include="Models\SnooperStackMessage.cs" />
