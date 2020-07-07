@@ -9,6 +9,7 @@ namespace SnooperSocket.Models
     public class SnooperPoolChannel
     {
         public event PoolChannelMessageReceived MessageReceived;
+
         public SnooperPoolChannel(string Name)
         {
             ChannelName = Name;

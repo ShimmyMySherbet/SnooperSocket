@@ -1,9 +1,11 @@
-﻿using SnooperSocket.Models;
+﻿using SnooperSocket.Cryptography.Protocals;
+using SnooperSocket.Models;
 using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Net;
 using System.Net.Sockets;
+using System.Security.Cryptography;
 using System.Text;
 using System.Threading;
 
@@ -13,9 +15,39 @@ namespace SnooperSocket.Test
     {
         private static void Main(string[] args)
         {
-            new Thread(Server).Start();
-            new Thread(Client).Start();
-            Thread.Sleep(-1);
+
+            //MemoryStream E = new MemoryStream();
+            ////using (CryptoStream S = new CryptoStream(E, new AesCryptoServiceProvider().CreateDecryptor(new byte[32], new byte[16]), CryptoStreamMode.Write))
+            ////{
+            ////}
+            //E.Position = 0;
+            MemoryStream BaseInput = new MemoryStream(new byte[] { 10, 21, 26, 37, 21, 26, 37, 21, 26, 37, 21, 26, 37, 21, 26, 37, 21, 26, 37 });
+            Console.WriteLine($"In:  {string.Join(", ", BaseInput.ToArray())}");
+            MutualKeyProtocal Protocal = new MutualKeyProtocal();
+            Protocal.Key = "HelloWorld!";
+
+            
+            
+            Dictionary<string, string> Headers = new Dictionary<string, string>();
+
+            Protocal.EncryptStream(BaseInput, out MemoryStream ENCStream, ref Headers);
+            Console.WriteLine($"ENC: {string.Join(", ", ENCStream.ToArray())}");
+
+  
+            Protocal.DecryptStream(ENCStream, out MemoryStream DECStream, ref Headers);
+            Console.WriteLine($"DEC: {string.Join(", ", DECStream.ToArray())}");
+
+
+            Console.ReadLine();
+
+
+
+
+
+
+            //new Thread(Server).Start();
+            //new Thread(Client).Start();
+            //Thread.Sleep(-1);
         }
 
         public static SnooperSocketClient ServerClient;

@@ -45,6 +45,9 @@
   </ItemGroup>
   <ItemGroup>
     <Compile Include="Cryptography\CryptographicProvider.cs" />
+    <Compile Include="Cryptography\Protocals\BaseSnooperSecurityProtocal.cs" />
+    <Compile Include="Cryptography\Protocals\MutualKeyProtocal.cs" />
+    <Compile Include="Cryptography\SnooperSecurityProtocal.cs" />
     <Compile Include="Models\SnooperBytes.cs" />
     <Compile Include="Models\SnooperChannel.cs" />
     <Compile Include="Models\SnooperChannelStack.cs" />

@@ -1,5 +1,6 @@
 ﻿using Newtonsoft.Json;
 using SnooperSocket.Cryptography;
+using SnooperSocket.Cryptography.Protocals;
 using SnooperSocket.Models;
 using System;
 using System.Collections.Concurrent;
@@ -14,21 +15,23 @@ namespace SnooperSocket
     public class SnooperSocketClient
     {
         public TcpClient Client;
-        private ConcurrentQueue<SnooperStackMessage> Queue = new ConcurrentQueue<SnooperStackMessage>();
+        protected ConcurrentQueue<SnooperStackMessage> Queue = new ConcurrentQueue<SnooperStackMessage>();
 
         public delegate void MessageReceivedArgs(SnooperMessage Message);
 
-        public event MessageReceivedArgs MessageReceived;
+        public event MessageReceivedArgs UnhandledMessageReceived;
 
         public delegate object RequestReceivedArgs(SnooperMessage Request);
 
-        public event RequestReceivedArgs RequestReceived;
+        public event RequestReceivedArgs UnhandledRequestReceived;
 
-        public readonly SnooperChannelStack Channels;
 
-        public bool RaiseHandledRequests = true;
+        public SnooperSecurityProtocal Security = new BaseSnooperSecurityProtocal();
 
-        public bool RaiseRequestResponses = false;
+        public SnooperChannelStack Channels;
+
+
+
 
         private SnooperPoolChannelStack PoolChannel;
 
@@ -39,6 +42,9 @@ namespace SnooperSocket
         private bool active = false;
 
         private SnooperRequestStack Requests = new SnooperRequestStack();
+
+
+
 
         public void Start()
         {
@@ -110,6 +116,7 @@ namespace SnooperSocket
 
         protected void RespondToRequest(SnooperMessage Request, object Response)
         {
+            if (Response == null) Response = new object();
             string Channel = Request.Channel;
             string RID = Request.Headers["$QueryID"];
             Dictionary<string, string> _Headers = new Dictionary<string, string>();
@@ -117,7 +124,8 @@ namespace SnooperSocket
             _Headers.Add("$ObjectType", Response.GetType().Name);
             _Headers.Add("$QueryID", RID);
             if (Channel != null) _Headers.Add($"$Channel", Channel);
-            MemoryStream DatStream = new MemoryStream(Encoding.UTF8.GetBytes(JsonConvert.SerializeObject(Response)));
+            string Resp = JsonConvert.SerializeObject(Response);
+            MemoryStream DatStream = new MemoryStream(Encoding.UTF8.GetBytes(Resp));
             Queue.Enqueue(new SnooperStackMessage() { Data = DatStream, Header = GetHeaderBytes(_Headers) });
         }
 
@@ -189,24 +197,21 @@ namespace SnooperSocket
                             {
                                 object ReturnObject = null;
                                 ReturnObject = Channels[NMSG.Channel].TryRaiseRequest(NMSG);
-                                if (ReturnObject == null)
-                                {
-                                    ReturnObject = RequestReceived?.Invoke(NMSG);
-                                }
+                                if (ReturnObject == null) ReturnObject = UnhandledRequestReceived?.Invoke(NMSG);
                                 if (ReturnObject == null) ReturnObject = new object();
                                 RespondToRequest(NMSG, ReturnObject);
                             }
                             else
                             {
                                 if (PoolChannel != null) NMSG.Requesthandled = PoolChannel[NMSG.Channel].TryRaise(NMSG, this);
-                                if ((NMSG.Requesthandled & RaiseHandledRequests) || !NMSG.Requesthandled)
+                                if (!NMSG.Requesthandled)
                                 {
                                     bool a = Channels[NMSG.Channel].TryRaise(NMSG);
                                     if (a) NMSG.Requesthandled = true;
                                 }
-                                if ((NMSG.Requesthandled & RaiseHandledRequests) || !NMSG.Requesthandled)
+                                if (!NMSG.Requesthandled)
                                 {
-                                    MessageReceived?.Invoke(NMSG);
+                                    UnhandledMessageReceived?.Invoke(NMSG);
                                 }
                             }
                         }).Start();
@@ -286,7 +291,6 @@ namespace SnooperSocket
             MemoryStream DatStream = new MemoryStream(Message);
             Queue.Enqueue(new SnooperStackMessage() { Data = DatStream, Header = GetHeaderBytes(_Headers) });
         }
-
         public void Write(Stream Message, Dictionary<string, string> Headers = null, string Channel = null)
         {
             Dictionary<string, string> _Headers = new Dictionary<string, string>();
@@ -312,9 +316,8 @@ namespace SnooperSocket
 
         public T Query<T>(object Data, Dictionary<string, string> Headers = null, string Channel = null)
         {
-
             string QueryID = CryptographicProvider.GetCryptographicallySecureString(16);
-            
+            if (Data == null) Data = new object();
             Dictionary<string, string> _Headers = new Dictionary<string, string>();
             _Headers.Add("$BaseMessageType", "Request");
             _Headers.Add("$ObjectType", Data.GetType().Name);
@@ -353,6 +356,17 @@ namespace SnooperSocket
             return Request.Response.ReadObject<T>();
         }
 
+
+
+        public T Query<T>(object Data, string Channel)
+        {
+            return Query<T>(Data, null, Channel);
+        }
+
+        public T Query<T>(string Channel)
+        {
+            return Query<T>(null, null, Channel) ;
+        }
         protected byte[] GetHeaderBytes(Dictionary<string, string> Headers)
         {
             MemoryStream DatStream = new MemoryStream();
