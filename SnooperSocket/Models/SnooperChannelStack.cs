@@ -24,6 +24,7 @@ namespace SnooperSocket.Models
                     if (Channel.ChannelName.ToLower() == ChannelName.ToLower()) return Channel;
                 }
                 SnooperChannel NewChannel = new SnooperChannel(ChannelName);
+                NewChannel.Socket = SnooperSocket;
                 Channels.Add(NewChannel);
                 return NewChannel;
             }
@@ -31,7 +32,7 @@ namespace SnooperSocket.Models
 
         public void CreateInstanceChannel(string Name)
         {
-            Channels.Add(new SnooperChannel(Name));
+            Channels.Add(new SnooperChannel(Name) { Socket = SnooperSocket });
         }
 
         public IEnumerator<SnooperChannel> GetEnumerator()

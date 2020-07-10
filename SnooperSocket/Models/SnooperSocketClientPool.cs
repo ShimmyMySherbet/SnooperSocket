@@ -15,12 +15,12 @@ namespace SnooperSocket.Models
 
         public void SendAllRawData(byte[] Message, string Header = null)
         {
-            foreach (SnooperSocketClient Client in _Clients) Client.WriteRawData(Message, Header);
+            //foreach (SnooperSocketClient Client in _Clients) Client.WriteRawData(Message, Header);
         }
 
         public void SendAllRawData(Stream Message, string Header = null)
         {
-            foreach (SnooperSocketClient Client in _Clients) Client.WriteRawData(Message, Header);
+            //foreach (SnooperSocketClient Client in _Clients) Client.WriteRawData(Message, Header);
         }
 
         public void SendAll(object Data, Dictionary<string, string> Headers = null, string Channel = null)

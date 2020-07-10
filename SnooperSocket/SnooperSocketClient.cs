@@ -17,21 +17,21 @@ namespace SnooperSocket
         public TcpClient Client;
         protected ConcurrentQueue<SnooperStackMessage> Queue = new ConcurrentQueue<SnooperStackMessage>();
 
-        public delegate void MessageReceivedArgs(SnooperMessage Message);
-
         public event MessageReceivedArgs UnhandledMessageReceived;
 
-        public delegate object RequestReceivedArgs(SnooperMessage Request);
+        public delegate void MessageReceivedArgs(SnooperMessage Message);
 
         public event RequestReceivedArgs UnhandledRequestReceived;
 
+        public delegate object RequestReceivedArgs(SnooperMessage Request);
 
-        public SnooperSecurityProtocal Security = new BaseSnooperSecurityProtocal();
+        public event ClientAuthorisedArgs ClientAuthorised;
 
-        public SnooperChannelStack Channels;
+        public delegate void ClientAuthorisedArgs();
 
-
-
+        public SnooperSecurityProtocal Security { get; protected set; } = new BaseSnooperSecurityProtocal();
+        public SnooperChannelStack Channels { get; protected set; }
+        protected SnooperChannelStack RedirectedChannels;
 
         private SnooperPoolChannelStack PoolChannel;
 
@@ -43,9 +43,6 @@ namespace SnooperSocket
 
         private SnooperRequestStack Requests = new SnooperRequestStack();
 
-
-
-
         public void Start()
         {
             if (!active)
@@ -53,12 +50,30 @@ namespace SnooperSocket
                 new Thread(ServerListener).Start();
                 new Thread(MessageManager).Start();
                 active = true;
+                Security.OnReady();
             }
+        }
+
+        public void InvokeAuthorisation()
+        {
+            ClientAuthorised?.Invoke();
+        }
+
+        public void SetSecurityProtocal(SnooperSecurityProtocal Protocal)
+        {
+            if (active)
+            {
+                throw new InvalidOperationException("The socket is already running.");
+            }
+            Security = Protocal;
+            Security.SetChannelOverrides(RedirectedChannels);
+            Security.Init();
         }
 
         public SnooperSocketClient(TcpClient tcpClient = null)
         {
             Channels = new SnooperChannelStack(this);
+            RedirectedChannels = new SnooperChannelStack(this);
             if (tcpClient != null) Client = tcpClient;
         }
 
@@ -85,8 +100,18 @@ namespace SnooperSocket
                         byte[] LenHeader = BitConverter.GetBytes((uint)MSG.Data.Length);
                         CStream.Write(LenHeader, 0, 4);
                         if (MSG.Header != null) CStream.Write(MSG.Header, 0, MSG.Header.Length);
+                        //if (MSG.Headers.Count != 0)
+                        //{
+                        //    using (MemoryStream HeaderStream = new MemoryStream(GetHeaderBytes(MSG.Headers)))
+                        //    {
+                        //        HeaderStream.Position = 0;
+                        //        HeaderStream.CopyTo(CStream);
+                        //    }
+                        //}
+
                         CStream.WriteByte((byte)SnooperBytes.DataStart);
                         MSG.Data.Position = 0;
+                        Console.WriteLine($"Writing body of {MSG.Data.Length} bytes");
                         MSG.Data.CopyTo(CStream);
                         MSG.Data.Dispose();
                     }
@@ -126,7 +151,17 @@ namespace SnooperSocket
             if (Channel != null) _Headers.Add($"$Channel", Channel);
             string Resp = JsonConvert.SerializeObject(Response);
             MemoryStream DatStream = new MemoryStream(Encoding.UTF8.GetBytes(Resp));
-            Queue.Enqueue(new SnooperStackMessage() { Data = DatStream, Header = GetHeaderBytes(_Headers) });
+
+            if (Security.EncryptStream(DatStream, out MemoryStream ResStream, ref _Headers))
+            {
+                if (DatStream != ResStream) DatStream.Dispose();
+
+                Queue.Enqueue(new SnooperStackMessage() { Data = ResStream, Header = GetHeaderBytes(_Headers) });
+            }
+            else
+            {
+                throw new UnauthorizedAccessException();
+            }
         }
 
         private void ServerListener()
@@ -161,60 +196,117 @@ namespace SnooperSocket
 
                         HeaderStream.Position = 0;
                         Dictionary<string, string> Headers = ParseHeader(HeaderStream);
-                        SnooperMessage NMSG = new SnooperMessage();
-
-                        NMSG.Headers = Headers;
-                        HeaderStream.Position = 0;
-                        NMSG.RawHeaderData = Encoding.UTF8.GetString(HeaderStream.ToArray());
-                        NMSG.Data = ContentStream;
-                        if (Headers.ContainsKey("$BaseMessageType"))
+                        if (Security.DecryptStream(ContentStream, out MemoryStream DecStream, ref Headers))
                         {
-                            NMSG.RequestType = (SnooperMessageType)Enum.Parse(typeof(SnooperMessageType), Headers["$BaseMessageType"]);
-                            NMSG.IsManagedMessage = true;
-                        }
-                        else
-                        {
-                            NMSG.IsManagedMessage = false;
-                        }
-
-                        if (Headers.ContainsKey("$Channel"))
-                        {
-                            NMSG.Channel = Headers["$Channel"];
-                        }
-                        if (Headers.ContainsKey("$ObjectType"))
-                        {
-                            NMSG.ObjectType = Headers["$ObjectType"];
-                        }
-
-                        new Thread(delegate ()
-                        {
-                            if (NMSG.RequestType == SnooperMessageType.Response)
+                            if (ContentStream != DecStream)
                             {
-                                string RID = NMSG.Headers["$QueryID"];
-                                Requests.ReleaseRequest(RID, NMSG);
+                                ContentStream.Dispose();
                             }
-                            else if (NMSG.RequestType == SnooperMessageType.Request)
+                            ContentStream = DecStream;
+
+                            SnooperMessage NMSG = new SnooperMessage();
+
+                            NMSG.Headers = Headers;
+                            HeaderStream.Position = 0;
+                            NMSG.RawHeaderData = Encoding.UTF8.GetString(HeaderStream.ToArray());
+                            NMSG.Data = ContentStream;
+                            if (Headers.ContainsKey("$BaseMessageType"))
                             {
-                                object ReturnObject = null;
-                                ReturnObject = Channels[NMSG.Channel].TryRaiseRequest(NMSG);
-                                if (ReturnObject == null) ReturnObject = UnhandledRequestReceived?.Invoke(NMSG);
-                                if (ReturnObject == null) ReturnObject = new object();
-                                RespondToRequest(NMSG, ReturnObject);
+                                NMSG.RequestType = (SnooperMessageType)Enum.Parse(typeof(SnooperMessageType), Headers["$BaseMessageType"]);
+                                NMSG.IsManagedMessage = true;
                             }
                             else
                             {
-                                if (PoolChannel != null) NMSG.Requesthandled = PoolChannel[NMSG.Channel].TryRaise(NMSG, this);
-                                if (!NMSG.Requesthandled)
-                                {
-                                    bool a = Channels[NMSG.Channel].TryRaise(NMSG);
-                                    if (a) NMSG.Requesthandled = true;
-                                }
-                                if (!NMSG.Requesthandled)
-                                {
-                                    UnhandledMessageReceived?.Invoke(NMSG);
-                                }
+                                NMSG.IsManagedMessage = false;
                             }
+
+                            if (Headers.ContainsKey("$Channel"))
+                            {
+                                NMSG.Channel = Headers["$Channel"];
+                            }
+                            if (Headers.ContainsKey("$ObjectType"))
+                            {
+                                NMSG.ObjectType = Headers["$ObjectType"];
+                            }
+
+                            new Thread(delegate ()
+                            {
+                            //if (NMSG.RequestType == SnooperMessageType.Response)
+                            //{
+                            //    string RID = NMSG.Headers["$QueryID"];
+                            //    Requests.ReleaseRequest(RID, NMSG);
+                            //} else
+                            //{
+                            //}
+
+                            if (NMSG.RequestType == SnooperMessageType.Response)
+                                {
+                                    string RID = NMSG.Headers["$QueryID"];
+                                    Requests.ReleaseRequest(RID, NMSG);
+                                }
+                                else if (NMSG.RequestType == SnooperMessageType.Request)
+                                {
+                                    object ReturnObject = null;
+                                    ReturnObject = RedirectedChannels[NMSG.Channel].TryRaiseRequest(NMSG);
+                                    if (ReturnObject == null && !Security.RedirectRequests)
+                                    {
+                                        ReturnObject = Channels[NMSG.Channel].TryRaiseRequest(NMSG);
+                                        if (ReturnObject == null) ReturnObject = UnhandledRequestReceived?.Invoke(NMSG);
+                                        if (ReturnObject == null) ReturnObject = new object();
+                                    }
+                                    RespondToRequest(NMSG, ReturnObject);
+                                }
+                                else
+                                {
+                                    bool RedirectHandled = RedirectedChannels[NMSG.Channel].TryRaise(NMSG);
+                                    if (!RedirectHandled && !Security.RedirectRequests)
+                                    {
+                                        if (PoolChannel != null) NMSG.Requesthandled = PoolChannel[NMSG.Channel].TryRaise(NMSG, this);
+
+                                        if (!NMSG.Requesthandled)
+                                        {
+                                            bool ChannelsHandled = Channels[NMSG.Channel].TryRaise(NMSG);
+                                            if (!ChannelsHandled)
+                                            {
+                                                UnhandledMessageReceived?.Invoke(NMSG);
+                                            }
+                                        }
+                                    }
+                                }
+
+                            //if (NMSG.RequestType == SnooperMessageType.Response)
+                            //{
+                            //    string RID = NMSG.Headers["$QueryID"];
+                            //    Requests.ReleaseRequest(RID, NMSG);
+                            //}
+                            //else if (NMSG.RequestType == SnooperMessageType.Request)
+                            //{
+                            //    object ReturnObject = null;
+                            //    ReturnObject = Channels[NMSG.Channel].TryRaiseRequest(NMSG);
+                            //    if (ReturnObject == null) ReturnObject = UnhandledRequestReceived?.Invoke(NMSG);
+                            //    if (ReturnObject == null) ReturnObject = new object();
+                            //    RespondToRequest(NMSG, ReturnObject);
+                            //}
+                            //else
+                            //{
+                            //    if (PoolChannel != null) NMSG.Requesthandled = PoolChannel[NMSG.Channel].TryRaise(NMSG, this);
+                            //    if (!NMSG.Requesthandled)
+                            //    {
+                            //        bool a = Channels[NMSG.Channel].TryRaise(NMSG);
+                            //        if (a) NMSG.Requesthandled = true;
+                            //    }
+                            //    if (!NMSG.Requesthandled)
+                            //    {
+                            //        UnhandledMessageReceived?.Invoke(NMSG);
+                            //    }
+                            //}
                         }).Start();
+                        }
+                        else
+                        {
+                            // Invalid Request
+                            ContentStream.Dispose();
+                        }
                     }
                 }
                 catch (ObjectDisposedException)
@@ -230,17 +322,15 @@ namespace SnooperSocket
             }
         }
 
-        public void WriteRawData(byte[] Message, string Header = null)
+        public void WriteRawData(byte[] Message)
         {
             var msg = new SnooperStackMessage() { Data = new MemoryStream(Message) };
-            if (Header != null) msg.Header = Encoding.UTF8.GetBytes(Header);
             Queue.Enqueue(msg);
         }
 
-        public void WriteRawData(Stream Message, string Header = null)
+        public void WriteRawData(Stream Message)
         {
             var msg = new SnooperStackMessage() { Data = Message };
-            if (Header != null) msg.Header = Encoding.UTF8.GetBytes(Header);
             Queue.Enqueue(msg);
         }
 
@@ -265,8 +355,11 @@ namespace SnooperSocket
                     }
                 }
             }
-            MemoryStream DatStream = new MemoryStream(UTF8Encoding.UTF8.GetBytes(JsonConvert.SerializeObject(Data)));
-            Queue.Enqueue(new SnooperStackMessage() { Data = DatStream, Header = GetHeaderBytes(_Headers) });
+            MemoryStream DatStream = new MemoryStream(Encoding.UTF8.GetBytes(JsonConvert.SerializeObject(Data)));
+
+            Security.EncryptStream(DatStream, out MemoryStream ResStream, ref _Headers);
+
+            Queue.Enqueue(new SnooperStackMessage() { Data = ResStream, Header = GetHeaderBytes(_Headers) });
         }
 
         public void Write(byte[] Message, Dictionary<string, string> Headers = null, string Channel = null)
@@ -289,8 +382,12 @@ namespace SnooperSocket
                 }
             }
             MemoryStream DatStream = new MemoryStream(Message);
-            Queue.Enqueue(new SnooperStackMessage() { Data = DatStream, Header = GetHeaderBytes(_Headers) });
+            Security.EncryptStream(DatStream, out MemoryStream ResStream, ref _Headers);
+            if (DatStream != ResStream) DatStream.Dispose();
+
+            Queue.Enqueue(new SnooperStackMessage() { Data = ResStream, Header = GetHeaderBytes(_Headers) });
         }
+
         public void Write(Stream Message, Dictionary<string, string> Headers = null, string Channel = null)
         {
             Dictionary<string, string> _Headers = new Dictionary<string, string>();
@@ -311,7 +408,11 @@ namespace SnooperSocket
                     }
                 }
             }
-            Queue.Enqueue(new SnooperStackMessage() { Data = Message, Header = GetHeaderBytes(_Headers) });
+
+            // Fix to allow all streams
+            Security.EncryptStream((MemoryStream)Message, out MemoryStream ResStream, ref _Headers);
+
+            Queue.Enqueue(new SnooperStackMessage() { Data = ResStream, Header = GetHeaderBytes(_Headers) });
         }
 
         public T Query<T>(object Data, Dictionary<string, string> Headers = null, string Channel = null)
@@ -344,19 +445,22 @@ namespace SnooperSocket
             if (BlankData)
             {
                 DatStream = new MemoryStream(new byte[] { 0x7b, 0x7c });
-            } else
+            }
+            else
             {
-              DatStream =  new MemoryStream(Encoding.UTF8.GetBytes(JsonConvert.SerializeObject(Data)));
+                DatStream = new MemoryStream(Encoding.UTF8.GetBytes(JsonConvert.SerializeObject(Data)));
             }
             SnooperRequest Request = new SnooperRequest();
             Request.RequestID = QueryID;
             Requests.StackRequest(Request);
-            Queue.Enqueue(new SnooperStackMessage() { Data = DatStream, Header = GetHeaderBytes(_Headers) });
+
+            Security.EncryptStream(DatStream, out MemoryStream ResStream, ref _Headers);
+            if (DatStream != ResStream) DatStream.Dispose();
+
+            Queue.Enqueue(new SnooperStackMessage() { Data = ResStream, Header = GetHeaderBytes(_Headers) });
             Request.Wait();
             return Request.Response.ReadObject<T>();
         }
-
-
 
         public T Query<T>(object Data, string Channel)
         {
@@ -365,8 +469,9 @@ namespace SnooperSocket
 
         public T Query<T>(string Channel)
         {
-            return Query<T>(null, null, Channel) ;
+            return Query<T>(null, null, Channel);
         }
+
         protected byte[] GetHeaderBytes(Dictionary<string, string> Headers)
         {
             MemoryStream DatStream = new MemoryStream();

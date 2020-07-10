@@ -54,6 +54,7 @@
     <Compile Include="Models\SnooperMessageType.cs" />
     <Compile Include="Models\SnooperPoolChannel.cs" />
     <Compile Include="Models\SnooperPoolChannelStack.cs" />
+    <Compile Include="Models\SnooperRedirectToken.cs" />
     <Compile Include="Models\SnooperRequest.cs" />
     <Compile Include="Models\SnooperRequestStack.cs" />
     <Compile Include="Models\SnooperSocketClientPool.cs" />

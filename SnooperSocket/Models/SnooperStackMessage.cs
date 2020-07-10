@@ -11,5 +11,6 @@ namespace SnooperSocket.Models
     {
         public Stream Data;
         public byte[] Header;
+        //public Dictionary<string, string> Headers = new Dictionary<string, string>();
     }
 }
