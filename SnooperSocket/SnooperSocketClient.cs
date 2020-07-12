@@ -43,16 +43,26 @@ namespace SnooperSocket
 
         private SnooperRequestStack Requests = new SnooperRequestStack();
 
+        private Stream NetStream;
+
+
         public void Start()
         {
             if (!active)
             {
+                if (NetStream == null) NetStream = Client.GetStream();
                 new Thread(ServerListener).Start();
                 new Thread(MessageManager).Start();
                 active = true;
                 Security.OnReady();
             }
         }
+
+        public void SetNetStream(Stream NewStream)
+        {
+            NetStream = NewStream;
+        }
+
 
         public void InvokeAuthorisation()
         {
@@ -89,7 +99,7 @@ namespace SnooperSocket
 
         private void MessageManager()
         {
-            NetworkStream CStream = Client.GetStream();
+            //NetworkStream CStream = Client.GetStream();
             while (Client.Connected)
             {
                 SnooperStackMessage MSG;
@@ -98,8 +108,8 @@ namespace SnooperSocket
                     try
                     {
                         byte[] LenHeader = BitConverter.GetBytes((uint)MSG.Data.Length);
-                        CStream.Write(LenHeader, 0, 4);
-                        if (MSG.Header != null) CStream.Write(MSG.Header, 0, MSG.Header.Length);
+                        NetStream.Write(LenHeader, 0, 4);
+                        if (MSG.Header != null) NetStream.Write(MSG.Header, 0, MSG.Header.Length);
                         //if (MSG.Headers.Count != 0)
                         //{
                         //    using (MemoryStream HeaderStream = new MemoryStream(GetHeaderBytes(MSG.Headers)))
@@ -109,10 +119,9 @@ namespace SnooperSocket
                         //    }
                         //}
 
-                        CStream.WriteByte((byte)SnooperBytes.DataStart);
+                        NetStream.WriteByte((byte)SnooperBytes.DataStart);
                         MSG.Data.Position = 0;
-                        Console.WriteLine($"Writing body of {MSG.Data.Length} bytes");
-                        MSG.Data.CopyTo(CStream);
+                        MSG.Data.CopyTo(NetStream);
                         MSG.Data.Dispose();
                     }
                     catch (IOException)
@@ -166,7 +175,7 @@ namespace SnooperSocket
 
         private void ServerListener()
         {
-            NetworkStream CStream = Client.GetStream();
+            //NetworkStream CStream = Client.GetStream();
             while (Client.Connected)
             {
                 try
@@ -174,11 +183,11 @@ namespace SnooperSocket
                     using (MemoryStream HeaderStream = new MemoryStream())
                     {
                         byte[] LengthHeader = new byte[4];
-                        CStream.Read(LengthHeader, 0, 4);
+                        NetStream.Read(LengthHeader, 0, 4);
                         uint MessageSize = BitConverter.ToUInt32(LengthHeader, 0);
                         while (true)
                         {
-                            int RByte = CStream.ReadByte();
+                            int RByte = NetStream.ReadByte();
                             if (RByte == (int)SnooperBytes.DataStart) break;
                             HeaderStream.WriteByte((byte)RByte);
                         }
@@ -190,7 +199,7 @@ namespace SnooperSocket
                             long Remaining = MessageSize - ContentStream.Length;
                             if (_BUFFERSIZE > Remaining) _BUFFERSIZE = (int)Remaining;
                             byte[] Buffer = new byte[_BUFFERSIZE];
-                            int Read = CStream.Read(Buffer, 0, _BUFFERSIZE);
+                            int Read = NetStream.Read(Buffer, 0, _BUFFERSIZE);
                             ContentStream.Write(Buffer, 0, Read);
                         }
 
