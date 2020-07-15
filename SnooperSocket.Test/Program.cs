@@ -15,36 +15,6 @@ namespace SnooperSocket.Test
     {
         private static void Main(string[] args)
         {
-
-            //MemoryStream E = new MemoryStream();
-            ////using (CryptoStream S = new CryptoStream(E, new AesCryptoServiceProvider().CreateDecryptor(new byte[32], new byte[16]), CryptoStreamMode.Write))
-            ////{
-            ////}
-            //E.Position = 0;
-            //MemoryStream BaseInput = new MemoryStream(new byte[] { 10, 21, 26, 37, 21, 26, 37, 21, 26, 37, 21, 26, 37, 21, 26, 37, 21, 26, 37 });
-            //Console.WriteLine($"In:  {string.Join(", ", BaseInput.ToArray())}");
-            //MutualKeyProtocal Protocal = new MutualKeyProtocal();
-            //Protocal.Key = "HelloWorld!";
-
-
-
-            //Dictionary<string, string> Headers = new Dictionary<string, string>();
-
-            //Protocal.EncryptStream(BaseInput, out MemoryStream ENCStream, ref Headers);
-            //Console.WriteLine($"ENC: {string.Join(", ", ENCStream.ToArray())}");
-
-
-            //Protocal.DecryptStream(ENCStream, out MemoryStream DECStream, ref Headers);
-            //Console.WriteLine($"DEC: {string.Join(", ", DECStream.ToArray())}");
-
-
-            //Console.ReadLine();
-
-
-
-
-
-
             new Thread(Server).Start();
             new Thread(Client).Start();
             Thread.Sleep(-1);
@@ -61,21 +31,27 @@ namespace SnooperSocket.Test
             Client.Connect(IPAddress.Parse("127.0.0.1"), 2081);
             Console.WriteLine("[Client] Connected.");
             LocalClient = new SnooperSocketClient() { Client = Client };
-            LocalClient.SetSecurityProtocal(new MutualKeyProtocal() { Key = k });
+            LocalClient.OnDisconnect += LocalClient_OnDisconnect;
+            LocalClient.SetSecurityProtocal(new MutualKeyProtocal() { Key = k, IsServer = false });
             LocalClient.Start();
+            Console.WriteLine($"[Client] Requesting Auth...");
             Console.WriteLine($"[Client] Authed: {((MutualKeyProtocal)LocalClient.Security).ValidateConnection()}");
-            //TransferObject transfer = LocalClient.Query<TransferObject>(new TransferObject(), null, "Request");
-            //Console.WriteLine("[Client] Query Returned: " + transfer.Data);
-
 
             Console.WriteLine("[Client] Sending on open stream");
             LocalClient.Write(new MSGDat() { Content = "HEYO DERE BOIO!" }, null, "$SnooperSec.MutualKeyProtocal.Validate");
 
-            while(true)
-            {
-                Console.ReadLine();
-                LocalClient.Write(new MSGDat() { Content = "HEY!" }, null, "Request");
-            }
+            //while(true)
+            //{
+            //    Console.ReadLine();
+            //    LocalClient.Write(new MSGDat() { Content = "HEY!" }, null, "Request");
+            //}
+            Console.WriteLine("DC...");
+            LocalClient.Disconnect();
+        }
+
+        private static void LocalClient_OnDisconnect(SnooperSocketClient Client)
+        {
+            Console.WriteLine("[Client] DISCONNECTED!");
         }
 
         public static string k = "!";
@@ -94,14 +70,20 @@ namespace SnooperSocket.Test
             var ent = tcpListener.AcceptTcpClient();
 
             ServerClient = new SnooperSocketClient() { Client = ent };
-            ServerClient.SetSecurityProtocal(new MutualKeyProtocal() { Key = k });
+            ServerClient.OnDisconnect += ServerClient_OnDisconnect;
+            ServerClient.SetSecurityProtocal(new MutualKeyProtocal() { Key = k, IsServer = true });
             ServerClient.Start();
-            //Console.WriteLine($"[Server] Authed: {((MutualKeyProtocal)ServerClient.Security).ValidateConnection()}");
-
 
             ServerClient.Channels["Request"].MessageReceived += ServerRequest_Message;
             ServerClient.Channels["$SnooperSec.MutualKeyProtocal.Validate"].MessageReceived += Program_MessageReceived; ;
             ServerClient.Channels["Request"].RequestReceived += ServerRequest_Request;
+
+            Console.WriteLine($"[Server] Authed: {ServerClient.Security.ValidateConnection()}");
+        }
+
+        private static void ServerClient_OnDisconnect(SnooperSocketClient Client)
+        {
+            Console.WriteLine("[Server] DISCONNECTED!");
         }
 
         private static void Program_MessageReceived(SnooperMessage message)

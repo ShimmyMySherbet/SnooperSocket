@@ -1,14 +1,14 @@
-﻿using Newtonsoft.Json;
-using SnooperSocket.Cryptography;
-using SnooperSocket.Cryptography.Protocals;
-using SnooperSocket.Models;
-using System;
+﻿using System;
 using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.IO;
 using System.Net.Sockets;
 using System.Text;
 using System.Threading;
+using Newtonsoft.Json;
+using SnooperSocket.Cryptography;
+using SnooperSocket.Cryptography.Protocals;
+using SnooperSocket.Models;
 
 namespace SnooperSocket
 {
@@ -45,15 +45,22 @@ namespace SnooperSocket
 
         private Stream NetStream;
 
+        public bool Connected { get; protected set; } = false;
+
+        private Thread MSGManager;
+        private Thread ServerManager;
 
         public void Start()
         {
             if (!active)
             {
                 if (NetStream == null) NetStream = Client.GetStream();
-                new Thread(ServerListener).Start();
-                new Thread(MessageManager).Start();
+                ServerManager = new Thread(ServerListener);
+                ServerManager.Start();
+                MSGManager = new Thread(MessageManager);
+                MSGManager.Start();
                 active = true;
+                Connected = true;
                 Security.OnReady();
             }
         }
@@ -62,7 +69,6 @@ namespace SnooperSocket
         {
             NetStream = NewStream;
         }
-
 
         public void InvokeAuthorisation()
         {
@@ -78,6 +84,21 @@ namespace SnooperSocket
             Security = Protocal;
             Security.SetChannelOverrides(RedirectedChannels);
             Security.Init();
+        }
+
+        public void Disconnect(bool SendMessage = true)
+        {
+            if (SendMessage)
+            {
+                Channels["$SnooperSocket.Disconnect"].Write(new byte[] { });
+            }
+            Flush();
+            Connected = false;
+            MSGManager.Abort();
+            ServerManager.Abort();
+            Client.Close();
+            active = false;
+            OnDisconnect?.Invoke(this);
         }
 
         public SnooperSocketClient(TcpClient tcpClient = null)
@@ -100,7 +121,7 @@ namespace SnooperSocket
         private void MessageManager()
         {
             //NetworkStream CStream = Client.GetStream();
-            while (Client.Connected)
+            while (Connected)
             {
                 SnooperStackMessage MSG;
                 if (Queue.TryDequeue(out MSG))
@@ -126,11 +147,11 @@ namespace SnooperSocket
                     }
                     catch (IOException)
                     {
-                        if (!Client.Connected) OnDisconnect?.Invoke(this);
+                        Disconnect(false);
                     }
                     catch (ObjectDisposedException)
                     {
-                        if (!Client.Connected) OnDisconnect?.Invoke(this);
+                        Disconnect(false);
                     }
                 }
                 else
@@ -176,7 +197,7 @@ namespace SnooperSocket
         private void ServerListener()
         {
             //NetworkStream CStream = Client.GetStream();
-            while (Client.Connected)
+            while (Connected)
             {
                 try
                 {
@@ -240,15 +261,13 @@ namespace SnooperSocket
 
                             new Thread(delegate ()
                             {
-                            //if (NMSG.RequestType == SnooperMessageType.Response)
-                            //{
-                            //    string RID = NMSG.Headers["$QueryID"];
-                            //    Requests.ReleaseRequest(RID, NMSG);
-                            //} else
-                            //{
-                            //}
+                                if (NMSG.Channel == "$SnooperSocket.Disconnect")
+                                {
+                                    Disconnect(false);
+                                    return;
 
-                            if (NMSG.RequestType == SnooperMessageType.Response)
+                                }
+                                else if (NMSG.RequestType == SnooperMessageType.Response)
                                 {
                                     string RID = NMSG.Headers["$QueryID"];
                                     Requests.ReleaseRequest(RID, NMSG);
@@ -282,34 +301,7 @@ namespace SnooperSocket
                                         }
                                     }
                                 }
-
-                            //if (NMSG.RequestType == SnooperMessageType.Response)
-                            //{
-                            //    string RID = NMSG.Headers["$QueryID"];
-                            //    Requests.ReleaseRequest(RID, NMSG);
-                            //}
-                            //else if (NMSG.RequestType == SnooperMessageType.Request)
-                            //{
-                            //    object ReturnObject = null;
-                            //    ReturnObject = Channels[NMSG.Channel].TryRaiseRequest(NMSG);
-                            //    if (ReturnObject == null) ReturnObject = UnhandledRequestReceived?.Invoke(NMSG);
-                            //    if (ReturnObject == null) ReturnObject = new object();
-                            //    RespondToRequest(NMSG, ReturnObject);
-                            //}
-                            //else
-                            //{
-                            //    if (PoolChannel != null) NMSG.Requesthandled = PoolChannel[NMSG.Channel].TryRaise(NMSG, this);
-                            //    if (!NMSG.Requesthandled)
-                            //    {
-                            //        bool a = Channels[NMSG.Channel].TryRaise(NMSG);
-                            //        if (a) NMSG.Requesthandled = true;
-                            //    }
-                            //    if (!NMSG.Requesthandled)
-                            //    {
-                            //        UnhandledMessageReceived?.Invoke(NMSG);
-                            //    }
-                            //}
-                        }).Start();
+                            }).Start();
                         }
                         else
                         {
@@ -321,12 +313,12 @@ namespace SnooperSocket
                 catch (ObjectDisposedException)
                 {
                     //Disconnected
-                    if (!Client.Connected) OnDisconnect?.Invoke(this);
+                    Disconnect(false);
                 }
                 catch (IOException)
                 {
                     //Disconnected Unexpectedly
-                    if (!Client.Connected) OnDisconnect?.Invoke(this);
+                    Disconnect(false);
                 }
             }
         }
