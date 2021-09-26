@@ -3,6 +3,7 @@ using System;
 using System.Net;
 using System.Net.Sockets;
 using System.Threading;
+using System.Threading.Tasks;
 
 namespace SSocketChatTest
 {
@@ -72,10 +73,11 @@ namespace SSocketChatTest
             Client.Client.Close();
         }
 
-        private static void OnMessage(SnooperSocket.Models.SnooperMessage message)
+        private static Task OnMessage(SnooperSocket.Models.SnooperMessage message)
         {
             ServerMessage MSG = message.ReadObject<ServerMessage>();
             Console.WriteLine($"[{MSG.Username}] {MSG.Message}");
+            return Task.CompletedTask;
         }
     }
 }

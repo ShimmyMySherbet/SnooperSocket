@@ -11,6 +11,8 @@ Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "SnooperRelayTest", "Snooper
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "SSocketChatTest", "SSocketChatTest\SSocketChatTest.csproj", "{A8C4DFA7-393B-45B0-8854-5B88BE8A0D71}"
 EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "ServerClientAuthTest", "ServerClientAuthTest\ServerClientAuthTest.csproj", "{374CA755-6A45-405C-9F9B-DEC8C4F5B100}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -33,6 +35,10 @@ Global
 		{A8C4DFA7-393B-45B0-8854-5B88BE8A0D71}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{A8C4DFA7-393B-45B0-8854-5B88BE8A0D71}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{A8C4DFA7-393B-45B0-8854-5B88BE8A0D71}.Release|Any CPU.Build.0 = Release|Any CPU
+		{374CA755-6A45-405C-9F9B-DEC8C4F5B100}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{374CA755-6A45-405C-9F9B-DEC8C4F5B100}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{374CA755-6A45-405C-9F9B-DEC8C4F5B100}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{374CA755-6A45-405C-9F9B-DEC8C4F5B100}.Release|Any CPU.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE

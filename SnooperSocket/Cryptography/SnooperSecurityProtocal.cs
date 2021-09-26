@@ -5,14 +5,13 @@ using System.IO;
 using System.Linq;
 using System.Net.Sockets;
 using System.Text;
+using System.Threading;
 using System.Threading.Tasks;
 
 namespace SnooperSocket.Cryptography
 {
     public abstract class SnooperSecurityProtocal
     {
-        //public delegate void RedirectRequestedArgs(SnooperChannelStack Redirect);
-        //public event RedirectRequestedArgs RedirectRequested;
         public SnooperSocketClient Socket;
         protected SnooperChannelStack Channels;
         private bool _Redirect = false;
@@ -25,14 +24,6 @@ namespace SnooperSocket.Cryptography
             protected set
             {
                 _Redirect = value;
-                //if (value != _Redirect)
-                //{
-                //    if (value)
-                //    {
-                //        Channels = new SnooperChannelStack(Socket);
-                //        //RedirectRequested?.Invoke(Channels);
-                //    }
-                //}
             }
         }
 
@@ -51,6 +42,21 @@ namespace SnooperSocket.Cryptography
         {
             return true;
         }
+
+        public virtual bool TryValidateConnection(int Timeout = 5000)
+        {
+            Task<bool> ValidateTask = new Task<bool>(ValidateConnection);
+            ValidateTask.Start();
+            int lp = 0;
+            while (!(lp >= Timeout || ValidateTask.IsCompleted))
+            {
+                Thread.Sleep(100);
+                lp += 100;
+            }
+            if (ValidateTask.IsCompleted) return ValidateTask.Result;
+            else return false;
+        }
+
         public virtual bool EncryptStream(MemoryStream Input, out MemoryStream Output, ref Dictionary<string, string> Headers)
         {
             Output = Input;

@@ -26,6 +26,7 @@ namespace SnooperSocket.Models
                 {
                     Request.Response = Response;
                     Request.HasResponse = true;
+                    Request.CompletionSource.SetResult(Response);
                     Requests.Remove(Request);
                     break;
                 }

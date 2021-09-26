@@ -16,7 +16,6 @@ namespace SnooperSocket.Cryptography.Protocals
         public bool ValidateServerCertificate(object sender, X509Certificate certificate, X509Chain chain, SslPolicyErrors sslPolicyErrors)
         {
             if (sslPolicyErrors == SslPolicyErrors.None) return true;
-            Console.WriteLine($"Certificate error: {sslPolicyErrors}");
             return false;
         }
 

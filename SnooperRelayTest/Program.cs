@@ -3,6 +3,7 @@ using SnooperSocket.Models;
 using System;
 using System.Net;
 using System.Net.Sockets;
+using System.Threading.Tasks;
 
 namespace SnooperRelayTest
 {
@@ -70,13 +71,14 @@ namespace SnooperRelayTest
             }
         }
 
-        private static void OnMessage(SnooperMessage message)
+        private static Task OnMessage(SnooperMessage message)
         {
             Message MSG = message.ReadObject<Message>();
             Console.WriteLine($"[{ClientName}] {MSG.MessageContent}");
+            return Task.CompletedTask;
         }
 
-        private static void UserJoined(SnooperMessage message)
+        private static Task UserJoined(SnooperMessage message)
         {
             Console.WriteLine("rec");
             LoginData Data = message.ReadObject<LoginData>();
@@ -89,6 +91,7 @@ namespace SnooperRelayTest
             {
                 Console.WriteLine($"[Server] User '{Data.Username}' left the chat.");
             }
+            return Task.CompletedTask;
         }
     }
 

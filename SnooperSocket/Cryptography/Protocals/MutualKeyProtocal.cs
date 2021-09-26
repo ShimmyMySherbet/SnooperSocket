@@ -4,6 +4,7 @@ using System.IO;
 using System.Linq;
 using System.Security.Cryptography;
 using System.Text;
+using System.Threading.Tasks;
 
 namespace SnooperSocket.Cryptography.Protocals
 {
@@ -26,15 +27,14 @@ namespace SnooperSocket.Cryptography.Protocals
             Channels["$SnooperSec.MutualKeyProtocal.RequestAuth"].RequestReceived += Auth_Requested; ;
         }
 
-        private object Auth_Requested(Models.SnooperMessage Request)
+        private Task<object> Auth_Requested(Models.SnooperMessage Request)
         {
             if (IsServer)
             {
-                Console.WriteLine("[Server] Recieved Auth Request, sending counter...");
-                return new MutualKeyProtocalAuthResponse() { Validated = ValidateConnection() };
+                return Task.FromResult((object)new MutualKeyProtocalAuthResponse() { Validated = ValidateConnection() });
             } else
             {
-                return new MutualKeyProtocalAuthResponse() { Validated = true };
+                return Task.FromResult((object)new MutualKeyProtocalAuthResponse() { Validated = true });
             }
         }
 
@@ -45,12 +45,10 @@ namespace SnooperSocket.Cryptography.Protocals
         }
         private bool RequestRemoteValidation()
         {
-            Console.WriteLine("[Client] Requesting remote validation...");
             return Channels["$SnooperSec.MutualKeyProtocal.RequestAuth"].Query<MutualKeyProtocalAuthResponse>().Validated;
         }
         private bool ValidateAsServer()
         {
-            Console.WriteLine("[Server] Creating Local Auth Token...");
             byte[] Data = new byte[16];
             using (RNGCryptoServiceProvider provider = new RNGCryptoServiceProvider())
                 provider.GetBytes(Data);
@@ -92,15 +90,13 @@ namespace SnooperSocket.Cryptography.Protocals
                 Salt = SaltString,
                 RawToken = q
             };
-            Console.WriteLine("[Server] Requesting remote token...");
             MutualKeyProtocalValidationResponse resp = Channels["$SnooperSec.MutualKeyProtocal.SignToken"].Query<MutualKeyProtocalValidationResponse>(MSG);
-            Console.WriteLine("[Server] Got remote token.");
             return resp.Token == MyToken;
         }
 
-        private object Validate_Message(Models.SnooperMessage Request)
+        private Task<object> Validate_Message(Models.SnooperMessage Request)
         {
-            if (IsServer) return new object();
+            if (IsServer) return null;
             MutualKeyProtocalValidationRequest RQ = Request.ReadObject<MutualKeyProtocalValidationRequest>();
             MemoryStream Output;
             MemoryStream Input = new MemoryStream(Encoding.UTF8.GetBytes(RQ.RawToken));
@@ -128,7 +124,7 @@ namespace SnooperSocket.Cryptography.Protocals
                 }
             }
             string Token = Convert.ToBase64String(Output.ToArray());
-            return new MutualKeyProtocalValidationResponse() { Token = Token };
+            return Task.FromResult((object)new MutualKeyProtocalValidationResponse() { Token = Token });
         }
 
         public override bool EncryptStream(MemoryStream Input, out MemoryStream Output, ref Dictionary<string, string> Headers)
@@ -175,7 +171,6 @@ namespace SnooperSocket.Cryptography.Protocals
             }
             catch (CryptographicException)
             {
-                Console.WriteLine("Encrypt Failiure");
                 Output = null;
                 return false;
             }
@@ -218,7 +213,6 @@ namespace SnooperSocket.Cryptography.Protocals
             }
             catch (CryptographicException)
             {
-                Console.WriteLine("Decrypt Failiure");
                 Output = null;
                 return false;
             }

@@ -8,6 +8,7 @@ using System.Net.Sockets;
 using System.Security.Cryptography;
 using System.Text;
 using System.Threading;
+using System.Threading.Tasks;
 
 namespace SnooperSocket.Test
 {
@@ -86,23 +87,25 @@ namespace SnooperSocket.Test
             Console.WriteLine("[Server] DISCONNECTED!");
         }
 
-        private static void Program_MessageReceived(SnooperMessage message)
+        private static Task Program_MessageReceived(SnooperMessage message)
         {
             Console.WriteLine($"REC MSG: {message.ReadObject<MSGDat>().Content}");
+            return Task.CompletedTask;
         }
 
-        private static object ServerRequest_Request(SnooperMessage Request)
+        private static Task<object> ServerRequest_Request(SnooperMessage Request)
         {
             Console.WriteLine("[Server] Got a Request in channel Request");
             Thread.Sleep(3000);
             Console.WriteLine("[Server] Returned Request");
-            return new TransferObject() { Data = "Hello World!" };
+            return Task.FromResult((object)new TransferObject() { Data = "Hello World!" });
         }
 
-        private static void ServerRequest_Message(SnooperMessage message)
+        private static Task ServerRequest_Message(SnooperMessage message)
         {
             Console.WriteLine("[Server] Got a message in channel Request");
             Console.WriteLine($"{message.ReadObject<MSGDat>().Content}");
+            return Task.CompletedTask;
         }
     }
 

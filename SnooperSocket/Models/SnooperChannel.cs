@@ -1,5 +1,6 @@
 ﻿using System.Collections.Generic;
 using System.IO;
+using System.Threading.Tasks;
 
 namespace SnooperSocket.Models
 {
@@ -18,21 +19,21 @@ namespace SnooperSocket.Models
 
         public readonly string ChannelName;
 
-        public delegate void ChannelMessageReceived(SnooperMessage message);
+        public delegate Task ChannelMessageReceived(SnooperMessage message);
 
-        public delegate object ChannelRequestRecevied(SnooperMessage Request);
+        public delegate Task<object> ChannelRequestRecevied(SnooperMessage Request);
 
-        public bool TryRaise(SnooperMessage Message)
+        public async Task<bool> TryRaise(SnooperMessage Message)
         {
             if (MessageReceived == null) return false;
-            MessageReceived.Invoke(Message);
+            await MessageReceived.Invoke(Message);
             return true;
         }
 
-        public object TryRaiseRequest(SnooperMessage Message)
+        public async Task<object> TryRaiseRequest(SnooperMessage Message)
         {
             if (RequestReceived == null) return null;
-            return RequestReceived.Invoke(Message);
+            return await RequestReceived.Invoke(Message);
         }
 
         #region "Mirrors"

@@ -1,8 +1,4 @@
-﻿using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Text;
-using System.Threading;
+﻿using System.Threading;
 using System.Threading.Tasks;
 
 namespace SnooperSocket.Models
@@ -12,14 +8,13 @@ namespace SnooperSocket.Models
         public string RequestID;
         public bool HasResponse = false;
         public SnooperMessage Response;
+        public TaskCompletionSource<SnooperMessage> CompletionSource = new TaskCompletionSource<SnooperMessage>();
 
         public void Wait()
         {
-            while(!HasResponse)
-            {
-                Thread.Sleep(100);
-            }
+            SpinWait.SpinUntil(() => HasResponse);
         }
 
+        public async Task<SnooperMessage> WaitAsync() => await CompletionSource.Task;
     }
 }
