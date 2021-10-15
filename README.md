@@ -1,3 +1,21 @@
+# This project has been retired.
+I made this project quite a long time ago, and it has a few significant issues. 
+
+Issues include **high idle CPU** usage and a **memory leak**.
+
+Due to the poor quality spaghetti code of this project, I do not plan to fix it.
+
+Instead, I plan to re-make an entirely new Socketing library to replace this. I just haven't decided on a name for it.
+
+Once the new library is publicly available on GitHub, I will be archiving this project.
+
+<br>
+<br>
+<br>
+<br>
+<br> 
+
+
 # SnooperSocket
 A .NET Socket/Message Broker designed to run through TCP.
 
