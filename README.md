@@ -5,14 +5,18 @@ Issues include **high idle CPU** usage and a **memory leak**.
 
 Due to the poor quality spaghetti code of this project, I do not plan to fix it.
 
-Instead, I plan to re-make an entirely new Socketing library to replace this. I just haven't decided on a name for it.
+Instead, I have created an entirely new library that is significantly faster and more memory efficent, along with a heap of new features.
 
-Once the new library is publicly available on GitHub, I will be archiving this project.
+### You can find the new project <a href="https://github.com/ShimmyMySherbet/NewSocket">Here</a>
 
 <br>
 <br>
 <br>
 <br>
+<br> 
+<br> 
+<br> 
+<br> 
 <br> 
 
 
